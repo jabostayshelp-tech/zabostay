@@ -17,6 +17,7 @@ import {
   Building2,
   Home,
   Hotel,
+  Shield,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useAuth } from "@/providers/auth-provider";
-import { Shield } from "lucide-react";
+import { mockNotifications } from "@/data/mock";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -99,12 +105,42 @@ export function Header() {
           {isLoggedIn ? (
             <>
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative rounded-full">
-                <Bell className="h-4 w-4" />
-                <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-red-500 text-white">
-                  3
-                </Badge>
-              </Button>
+              <Popover>
+                <PopoverTrigger className="relative inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-accent transition-colors">
+                  <Bell className="h-4 w-4" />
+                  <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-red-500 text-white">
+                    {mockNotifications.filter((n) => !n.isRead).length}
+                  </Badge>
+                </PopoverTrigger>
+                <PopoverContent align="end" sideOffset={8} className="w-80 p-0">
+                  <div className="p-3 border-b border-border/40">
+                    <h4 className="font-semibold text-sm">Notifikasi</h4>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {mockNotifications.map((notif) => (
+                      <Link
+                        key={notif.id}
+                        href={notif.link || "/dashboard"}
+                        className={`block px-3 py-2.5 hover:bg-accent transition-colors border-b border-border/20 last:border-0 ${
+                          !notif.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""
+                        }`}
+                      >
+                        <p className="text-sm font-medium">{notif.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          {notif.message}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="p-2 border-t border-border/40">
+                    <Link href="/dashboard">
+                      <Button variant="ghost" size="sm" className="w-full text-xs">
+                        Lihat Semua
+                      </Button>
+                    </Link>
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               {/* Wishlist */}
               <Link href="/dashboard/wishlist">
