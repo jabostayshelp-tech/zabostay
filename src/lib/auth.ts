@@ -63,11 +63,11 @@ export function seedAuth() {
 }
 
 export interface RegisterInput {
-  name: string;
+  name?: string;
   email: string;
-  phone: string;
+  phone?: string;
   password: string;
-  confirmPassword: string;
+  confirmPassword?: string;
 }
 
 export interface AuthResult {
@@ -83,22 +83,19 @@ function stripPassword(user: StoredUser): AuthUser {
 }
 
 export function register(input: RegisterInput): AuthResult {
-  const name = input.name.trim();
+  const name = (input.name || "").trim();
   const email = input.email.trim().toLowerCase();
-  const phone = input.phone.trim();
+  const phone = (input.phone || "").trim();
 
-  if (!name || !email || !phone || !input.password) {
-    return { ok: false, error: "Semua field wajib diisi." };
+  if (!email || !input.password) {
+    return { ok: false, error: "Email dan password wajib diisi." };
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return { ok: false, error: "Format email tidak valid." };
   }
-  if (input.password.length < 8) {
-    return { ok: false, error: "Password minimal 8 karakter." };
-  }
-  if (input.password !== input.confirmPassword) {
-    return { ok: false, error: "Konfirmasi password tidak cocok." };
+  if (input.password.length < 6) {
+    return { ok: false, error: "Password minimal 6 karakter." };
   }
 
   const users = readUsers();
@@ -108,7 +105,7 @@ export function register(input: RegisterInput): AuthResult {
 
   const newUser: StoredUser = {
     id: `user-${Date.now()}`,
-    name,
+    name: name || email.split("@")[0],
     email,
     phone,
     role: "customer",

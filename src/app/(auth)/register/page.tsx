@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, User, Phone, Building2, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Building2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,11 +19,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
-    name: "",
     email: "",
-    phone: "",
     password: "",
-    confirmPassword: "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -36,9 +33,8 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
 
-    // Simulate a short network delay for UX, then persist.
     setTimeout(() => {
-      const result = register(form);
+      const result = register({ email: form.email, password: form.password });
       setLoading(false);
 
       if (!result.ok) {
@@ -71,7 +67,7 @@ export default function RegisterPage() {
       <div className="space-y-2 mb-8">
         <h2 className="text-2xl font-bold">Buat Akun Baru</h2>
         <p className="text-muted-foreground">
-          Daftar dan mulai booking penginapan terbaik
+          Cukup isi email dan password, akun langsung siap digunakan
         </p>
       </div>
 
@@ -83,21 +79,6 @@ export default function RegisterPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Nama Lengkap</Label>
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="name"
-              placeholder="Nama lengkap Anda"
-              className="pl-10"
-              value={form.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              required
-            />
-          </div>
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <div className="relative">
@@ -115,29 +96,13 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">No. HP</Label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="08xxxxxxxxxx"
-              className="pl-10"
-              value={form.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="Minimal 8 karakter"
+              placeholder="Minimal 6 karakter"
               className="pl-10 pr-10"
               value={form.password}
               onChange={(e) => handleChange("password", e.target.value)}
@@ -153,28 +118,12 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Ulangi password"
-              className="pl-10"
-              value={form.confirmPassword}
-              onChange={(e) => handleChange("confirmPassword", e.target.value)}
-              required
-            />
-          </div>
-        </div>
-
         <Button
           type="submit"
           className="w-full bg-blue-600 hover:bg-blue-700 text-white"
           disabled={loading}
         >
-          {loading ? "Memproses..." : "Daftar"}
+          {loading ? "Memproses..." : "Daftar Sekarang"}
         </Button>
       </form>
 

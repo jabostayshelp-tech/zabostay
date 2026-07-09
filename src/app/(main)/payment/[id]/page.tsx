@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -57,6 +56,44 @@ export default function PaymentPage() {
   const [bookingCode] = useState(
     () => `STB-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 900 + 100)}`
   );
+
+  // 24-hour countdown timer
+  const [timeLeft, setTimeLeft] = useState(24 * 60 * 60); // 24 hours in seconds
+
+  // Dynamic payment settings from localStorage (admin configurable)
+  const [qrisImage, setQrisImage] = useState("/images/payment/qris-code.png");
+  const [gopayNumber, setGopayNumber] = useState("0812-0000-0001");
+
+  useEffect(() => {
+    // Load admin settings
+    if (typeof window !== "undefined") {
+      const savedQris = localStorage.getItem("staybook_qris_image");
+      const savedGopay = localStorage.getItem("staybook_gopay_number");
+      if (savedQris) setQrisImage(savedQris);
+      if (savedGopay) setGopayNumber(savedGopay);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (paymentStatus !== "pending") return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 0) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [paymentStatus]);
+
+  const formatTimer = useCallback((seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }, []);
 
   if (!property) {
     return (
@@ -217,7 +254,8 @@ export default function PaymentPage() {
           </motion.h1>
           <p className="text-blue-100 flex items-center gap-2">
             <Clock className="h-4 w-4" />
-            Selesaikan pembayaran dalam 60:00
+            Selesaikan pembayaran dalam{" "}
+            <span className="font-mono font-bold text-white">{formatTimer(timeLeft)}</span>
           </p>
         </div>
       </div>
@@ -259,14 +297,13 @@ export default function PaymentPage() {
                           Scan QR code di bawah untuk membayar via QRIS
                         </p>
                         <div className="relative bg-white p-4 rounded-xl shadow-lg border inline-block">
-                          {/* QRIS Payment QR Code - User's uploaded image */}
-                          <Image
-                            src="/images/payment/qris-code.png"
+                          {/* QRIS Payment QR Code - Admin configurable */}
+                          <img
+                            src={qrisImage}
                             alt="QRIS Payment Code - Scan untuk membayar"
                             width={280}
                             height={280}
-                            className="rounded-lg"
-                            priority
+                            className="rounded-lg w-[280px] h-[280px] object-contain"
                           />
                           <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
                             <Badge className="bg-blue-600 text-white shadow-lg">
@@ -318,6 +355,30 @@ export default function PaymentPage() {
                             )}
                           </button>
                         ))}
+                      {selectedMethod === "gopay" && (
+                        <div className="mt-4 p-4 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-2">Nomor GoPay Tujuan</p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-lg font-mono font-bold tracking-wider">
+                              {gopayNumber}
+                            </code>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                navigator.clipboard.writeText(gopayNumber.replace(/[^0-9]/g, ""));
+                                toast.success("Nomor GoPay disalin.");
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Transfer sebesar {formatCurrency(totalPrice)} ke nomor di atas
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
 
