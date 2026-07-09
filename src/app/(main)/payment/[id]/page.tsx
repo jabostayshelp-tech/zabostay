@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   QrCode,
   Wallet,
@@ -15,14 +16,20 @@ import {
   Download,
   Shield,
   AlertCircle,
+  Ticket,
+  X,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getPropertyById } from "@/data/mock";
+import { getPropertyById, promos } from "@/data/mock";
 import { formatCurrency } from "@/lib/utils";
+import { applyVoucher } from "@/lib/storage";
+import { Promo } from "@/types";
 
 const paymentMethods = [
   { id: "qris", label: "QRIS", icon: QrCode, category: "qris" },
@@ -37,9 +44,19 @@ const paymentMethods = [
 
 export default function PaymentPage() {
   const params = useParams();
+  const router = useRouter();
   const property = getPropertyById(params.id as string);
   const [selectedMethod, setSelectedMethod] = useState("qris");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "processing" | "success">("pending");
+
+  // Voucher state
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<Promo | null>(null);
+  const [discount, setDiscount] = useState(0);
+  const [voucherError, setVoucherError] = useState("");
+  const [bookingCode] = useState(
+    () => `STB-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 900 + 100)}`
+  );
 
   if (!property) {
     return (
@@ -51,12 +68,79 @@ export default function PaymentPage() {
 
   const room = property.rooms[0];
   const basePrice = room.pricePerNight;
-  const tax = Math.round(basePrice * 0.11);
-  const totalPrice = basePrice + tax;
+  const subtotalAfterDiscount = Math.max(0, basePrice - discount);
+  const tax = Math.round(subtotalAfterDiscount * 0.11);
+  const totalPrice = subtotalAfterDiscount + tax;
+
+  const handleApplyVoucher = () => {
+    setVoucherError("");
+    const result = applyVoucher(voucherCode, basePrice);
+    if (!result.ok) {
+      setVoucherError(result.error || "Voucher tidak valid.");
+      toast.error(result.error || "Voucher tidak valid.");
+      return;
+    }
+    setAppliedPromo(result.promo!);
+    setDiscount(result.discount!);
+    toast.success(
+      `Voucher ${result.promo!.code} diterapkan! Anda hemat ${formatCurrency(result.discount!)}`
+    );
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedPromo(null);
+    setDiscount(0);
+    setVoucherCode("");
+    setVoucherError("");
+    toast.info("Voucher dihapus.");
+  };
 
   const handlePay = () => {
     setPaymentStatus("processing");
-    setTimeout(() => setPaymentStatus("success"), 3000);
+    setTimeout(() => {
+      setPaymentStatus("success");
+      toast.success("Pembayaran berhasil!");
+    }, 3000);
+  };
+
+  const handleDownloadInvoice = () => {
+    const invoiceText = [
+      "STAYBOOK INDONESIA - INVOICE",
+      "================================",
+      `Kode Booking : ${bookingCode}`,
+      `Properti     : ${property.name}`,
+      `Kamar        : ${room.name}`,
+      `Kota         : ${property.city.name}`,
+      "--------------------------------",
+      `Harga Kamar  : ${formatCurrency(basePrice)}`,
+      appliedPromo
+        ? `Diskon (${appliedPromo.code}) : -${formatCurrency(discount)}`
+        : "Diskon       : -",
+      `Pajak (11%)  : ${formatCurrency(tax)}`,
+      `TOTAL DIBAYAR: ${formatCurrency(totalPrice)}`,
+      "--------------------------------",
+      `Metode       : ${paymentMethods.find((m) => m.id === selectedMethod)?.label || selectedMethod}`,
+      `Status       : LUNAS`,
+      `Tanggal      : ${new Date().toLocaleString("id-ID")}`,
+      "================================",
+      "Terima kasih telah menggunakan StayBook Indonesia.",
+    ].join("\n");
+
+    const blob = new Blob([invoiceText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Invoice-${bookingCode}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Invoice diunduh.");
+  };
+
+  const handleCopyVa = () => {
+    navigator.clipboard.writeText("880812345678 9012".replace(/\s/g, ""));
+    toast.success("Nomor Virtual Account disalin.");
   };
 
   if (paymentStatus === "success") {
@@ -78,12 +162,20 @@ export default function PaymentPage() {
             <CardContent className="p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Kode Booking</span>
-                <span className="font-mono font-semibold">STB-20240701-001</span>
+                <span className="font-mono font-semibold">{bookingCode}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Properti</span>
                 <span>{property.name}</span>
               </div>
+              {appliedPromo && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Voucher</span>
+                  <span className="text-green-600">
+                    {appliedPromo.code} (-{formatCurrency(discount)})
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Dibayar</span>
                 <span className="font-semibold text-blue-600">{formatCurrency(totalPrice)}</span>
@@ -95,11 +187,14 @@ export default function PaymentPage() {
             </CardContent>
           </Card>
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1">
+            <Button variant="outline" className="flex-1" onClick={handleDownloadInvoice}>
               <Download className="h-4 w-4 mr-2" />
               Download Invoice
             </Button>
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+            <Button
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => router.push("/dashboard/bookings")}
+            >
               Lihat Booking
             </Button>
           </div>
@@ -258,7 +353,7 @@ export default function PaymentPage() {
                             <code className="text-lg font-mono font-bold tracking-wider">
                               8808 1234 5678 9012
                             </code>
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleCopyVa}>
                               <Copy className="h-4 w-4" />
                             </Button>
                           </div>
@@ -335,7 +430,81 @@ export default function PaymentPage() {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24">
+            <div className="sticky top-24 space-y-4">
+              {/* Voucher Card */}
+              <Card className="shadow-lg">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Ticket className="h-4 w-4 text-blue-600" />
+                    Kode Voucher
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {appliedPromo ? (
+                    <div className="flex items-center justify-between rounded-lg border border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-950/30 p-3">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-green-600" />
+                        <div>
+                          <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+                            {appliedPromo.code}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            Hemat {formatCurrency(discount)}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-red-500 hover:text-red-600"
+                        onClick={handleRemoveVoucher}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Masukkan kode"
+                          value={voucherCode}
+                          onChange={(e) => {
+                            setVoucherCode(e.target.value.toUpperCase());
+                            if (voucherError) setVoucherError("");
+                          }}
+                          className="uppercase"
+                        />
+                        <Button
+                          onClick={handleApplyVoucher}
+                          className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                        >
+                          Pakai
+                        </Button>
+                      </div>
+                      {voucherError && (
+                        <p className="text-xs text-red-500 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {voucherError}
+                        </p>
+                      )}
+                      {/* Suggested vouchers */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {promos.slice(0, 3).map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => setVoucherCode(p.code)}
+                            className="text-xs px-2 py-1 rounded border border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                          >
+                            {p.code}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Summary Card */}
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg">Ringkasan Pesanan</CardTitle>
@@ -360,6 +529,12 @@ export default function PaymentPage() {
                       <span className="text-muted-foreground">Harga kamar</span>
                       <span>{formatCurrency(basePrice)}</span>
                     </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Diskon voucher</span>
+                        <span>-{formatCurrency(discount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Pajak (11%)</span>
                       <span>{formatCurrency(tax)}</span>

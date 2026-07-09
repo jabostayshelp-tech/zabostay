@@ -1,13 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Star, MapPin, Heart, Zap, Coffee, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Property } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { isInWishlist, toggleWishlist } from "@/lib/storage";
 
 interface PropertyCardProps {
   property: Property;
@@ -16,6 +19,26 @@ interface PropertyCardProps {
 
 export function PropertyCard({ property, index = 0 }: PropertyCardProps) {
   const primaryImage = property.images.find((img) => img.isPrimary) || property.images[0];
+  const [wishlisted, setWishlisted] = useState(false);
+
+  useEffect(() => {
+    setWishlisted(isInWishlist(property.id));
+    const handler = () => setWishlisted(isInWishlist(property.id));
+    window.addEventListener("staybook-wishlist-changed", handler);
+    return () => window.removeEventListener("staybook-wishlist-changed", handler);
+  }, [property.id]);
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const added = toggleWishlist(property.id);
+    setWishlisted(added);
+    toast[added ? "success" : "info"](
+      added
+        ? `${property.name} ditambahkan ke wishlist`
+        : `${property.name} dihapus dari wishlist`
+    );
+  };
 
   return (
     <motion.div
@@ -63,12 +86,14 @@ export function PropertyCard({ property, index = 0 }: PropertyCardProps) {
               size="icon"
               variant="ghost"
               className="absolute top-3 right-3 h-8 w-8 rounded-full bg-white/80 hover:bg-white shadow-sm"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
+              onClick={handleWishlist}
+              aria-label={wishlisted ? "Hapus dari wishlist" : "Tambah ke wishlist"}
             >
-              <Heart className="h-4 w-4 text-slate-600" />
+              <Heart
+                className={`h-4 w-4 transition-colors ${
+                  wishlisted ? "fill-red-500 text-red-500" : "text-slate-600"
+                }`}
+              />
             </Button>
 
             {/* Type Badge */}

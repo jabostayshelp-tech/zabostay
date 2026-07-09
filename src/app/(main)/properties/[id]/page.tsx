@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   Star,
   MapPin,
@@ -34,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPropertyById, properties } from "@/data/mock";
 import { formatCurrency } from "@/lib/utils";
 import { PropertyCard } from "@/components/shared/property-card";
+import { isInWishlist, toggleWishlist } from "@/lib/storage";
 
 const facilityIcons: Record<string, React.ElementType> = {
   Wifi,
@@ -52,9 +54,24 @@ const facilityIcons: Record<string, React.ElementType> = {
 
 export default function PropertyDetailPage() {
   const params = useParams();
-  const property = getPropertyById(params.id as string);
+  const router = useRouter();
+  const propertyId = params.id as string;
+  const property = getPropertyById(propertyId);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [bookingType, setBookingType] = useState<"per_day" | "per_hour">("per_day");
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [checkInTime, setCheckInTime] = useState("");
+  const [checkOutTime, setCheckOutTime] = useState("");
+  const [guests, setGuests] = useState("2");
+  const [wishlisted, setWishlisted] = useState(false);
+
+  useEffect(() => {
+    setWishlisted(isInWishlist(propertyId));
+    const handler = () => setWishlisted(isInWishlist(propertyId));
+    window.addEventListener("staybook-wishlist-changed", handler);
+    return () => window.removeEventListener("staybook-wishlist-changed", handler);
+  }, [propertyId]);
 
   if (!property) {
     return (
@@ -67,6 +84,44 @@ export default function PropertyDetailPage() {
   const similarProperties = properties
     .filter((p) => p.type === property.type && p.id !== property.id)
     .slice(0, 4);
+
+  const handleWishlist = () => {
+    const added = toggleWishlist(property.id);
+    setWishlisted(added);
+    toast[added ? "success" : "info"](
+      added
+        ? `${property.name} ditambahkan ke wishlist`
+        : `${property.name} dihapus dari wishlist`
+    );
+  };
+
+  const handleShare = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: property.name, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link properti disalin ke clipboard");
+      }
+    } catch {
+      // user cancelled share dialog; ignore
+    }
+  };
+
+  const goToBooking = () => {
+    const params = new URLSearchParams();
+    params.set("type", bookingType);
+    if (bookingType === "per_day") {
+      if (checkIn) params.set("checkIn", checkIn);
+      if (checkOut) params.set("checkOut", checkOut);
+    } else {
+      if (checkInTime) params.set("checkInTime", checkInTime);
+      if (checkOutTime) params.set("checkOutTime", checkOutTime);
+    }
+    params.set("guests", guests);
+    router.push(`/booking/${property.id}?${params.toString()}`);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,10 +180,26 @@ export default function PropertyDetailPage() {
 
           {/* Actions */}
           <div className="absolute top-4 right-4 flex gap-2">
-            <Button size="icon" variant="ghost" className="bg-white/80 hover:bg-white rounded-full">
-              <Heart className="h-4 w-4" />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="bg-white/80 hover:bg-white rounded-full"
+              onClick={handleWishlist}
+              aria-label="Wishlist"
+            >
+              <Heart
+                className={`h-4 w-4 ${
+                  wishlisted ? "fill-red-500 text-red-500" : ""
+                }`}
+              />
             </Button>
-            <Button size="icon" variant="ghost" className="bg-white/80 hover:bg-white rounded-full">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="bg-white/80 hover:bg-white rounded-full"
+              onClick={handleShare}
+              aria-label="Bagikan"
+            >
               <Share2 className="h-4 w-4" />
             </Button>
           </div>
@@ -375,6 +446,8 @@ export default function PropertyDetailPage() {
                           <label className="text-xs font-medium text-muted-foreground">Check In</label>
                           <input
                             type="date"
+                            value={checkIn}
+                            onChange={(e) => setCheckIn(e.target.value)}
                             className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
                           />
                         </div>
@@ -382,6 +455,8 @@ export default function PropertyDetailPage() {
                           <label className="text-xs font-medium text-muted-foreground">Check Out</label>
                           <input
                             type="date"
+                            value={checkOut}
+                            onChange={(e) => setCheckOut(e.target.value)}
                             className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
                           />
                         </div>
@@ -394,6 +469,8 @@ export default function PropertyDetailPage() {
                           <label className="text-xs font-medium text-muted-foreground">Jam Check In</label>
                           <input
                             type="time"
+                            value={checkInTime}
+                            onChange={(e) => setCheckInTime(e.target.value)}
                             className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
                           />
                         </div>
@@ -401,6 +478,8 @@ export default function PropertyDetailPage() {
                           <label className="text-xs font-medium text-muted-foreground">Jam Check Out</label>
                           <input
                             type="time"
+                            value={checkOutTime}
+                            onChange={(e) => setCheckOutTime(e.target.value)}
                             className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
                           />
                         </div>
@@ -411,7 +490,11 @@ export default function PropertyDetailPage() {
                   {/* Guests */}
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Jumlah Tamu</label>
-                    <select className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm">
+                    <select
+                      value={guests}
+                      onChange={(e) => setGuests(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    >
                       {[1, 2, 3, 4, 5, 6].map((n) => (
                         <option key={n} value={n}>
                           {n} Tamu
@@ -444,11 +527,12 @@ export default function PropertyDetailPage() {
                     )}
                   </div>
 
-                  <Link href={`/booking/${property.id}`} className="block">
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25">
-                      Booking Sekarang
-                    </Button>
-                  </Link>
+                  <Button
+                    onClick={goToBooking}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25"
+                  >
+                    Booking Sekarang
+                  </Button>
 
                   <p className="text-xs text-center text-muted-foreground">
                     {property.availableRooms} kamar tersisa

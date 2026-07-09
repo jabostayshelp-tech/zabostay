@@ -18,6 +18,7 @@ import {
   Home,
   Hotel,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,11 +28,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/providers/auth-provider";
+import { Shield } from "lucide-react";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const [isLoggedIn] = useState(false);
+  const router = useRouter();
+  const { isLoggedIn, isAdmin, user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
 
   const navLinks = [
     { name: "Hotel", href: "/properties?type=hotel", icon: Hotel },
@@ -112,6 +121,19 @@ export function Header() {
                   </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium truncate">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  {isAdmin && (
+                    <DropdownMenuItem>
+                      <Link href="/admin" className="flex items-center gap-2 w-full">
+                        <Shield className="h-4 w-4" />
+                        Panel Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem>
                     <Link href="/dashboard" className="flex items-center gap-2 w-full">
                       <User className="h-4 w-4" />
@@ -131,7 +153,7 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600">
+                  <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
                   </DropdownMenuItem>
@@ -187,16 +209,47 @@ export function Header() {
                 </Link>
               ))}
               <div className="pt-2 border-t border-border/40 space-y-2">
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full">
-                    Masuk
-                  </Button>
-                </Link>
-                <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                    Daftar
-                  </Button>
-                </Link>
+                {isLoggedIn ? (
+                  <>
+                    {isAdmin && (
+                      <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="outline" className="w-full justify-start gap-2">
+                          <Shield className="h-4 w-4" />
+                          Panel Admin
+                        </Button>
+                      </Link>
+                    )}
+                    <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="outline" className="w-full justify-start gap-2">
+                        <User className="h-4 w-4" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                    <Button
+                      className="w-full bg-red-600 hover:bg-red-700 text-white justify-start gap-2"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        handleLogout();
+                      }}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="outline" className="w-full">
+                        Masuk
+                      </Button>
+                    </Link>
+                    <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                        Daftar
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

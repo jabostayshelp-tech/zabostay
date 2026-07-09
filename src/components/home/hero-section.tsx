@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Search, MapPin, Calendar, Users, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
 import { cities } from "@/data/mock";
 
 export function HeroSection() {
+  const router = useRouter();
   const [searchData, setSearchData] = useState({
     city: "",
     checkIn: "",
@@ -23,6 +25,18 @@ export function HeroSection() {
     guests: "2",
     type: "",
   });
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (searchData.city) params.set("city", searchData.city);
+    if (searchData.type && searchData.type !== "all")
+      params.set("type", searchData.type);
+    if (searchData.checkIn) params.set("checkIn", searchData.checkIn);
+    if (searchData.checkOut) params.set("checkOut", searchData.checkOut);
+    if (searchData.guests) params.set("guests", searchData.guests);
+    const query = params.toString();
+    router.push(`/properties${query ? `?${query}` : ""}`);
+  };
 
   return (
     <section className="relative min-h-[600px] lg:min-h-[700px] flex items-center overflow-hidden">
@@ -205,6 +219,7 @@ export function HeroSection() {
           <div className="mt-4 flex justify-center">
             <Button
               size="lg"
+              onClick={handleSearch}
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 shadow-lg shadow-blue-600/25 rounded-xl"
             >
               <Search className="h-4 w-4 mr-2" />

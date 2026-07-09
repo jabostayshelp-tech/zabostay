@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Filter,
@@ -33,19 +34,44 @@ import { Separator } from "@/components/ui/separator";
 import { PropertyCard } from "@/components/shared/property-card";
 import { properties, cities, facilities } from "@/data/mock";
 
-export default function PropertiesPage() {
+function PropertiesContent() {
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState("popular");
   const [selectedType, setSelectedType] = useState("all");
   const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
   const [selectedCity, setSelectedCity] = useState("all");
+  const [minRating, setMinRating] = useState(0);
+  const [quickFilters, setQuickFilters] = useState({
+    freeBreakfast: false,
+    refundable: false,
+    instantBooking: false,
+    hasPromo: false,
+  });
+
+  // Apply search query params from the home page hero search.
+  useEffect(() => {
+    const type = searchParams.get("type");
+    const city = searchParams.get("city");
+    const flashsale = searchParams.get("flashsale");
+    if (type) setSelectedType(type);
+    if (city) setSelectedCity(city);
+    if (flashsale === "true")
+      setQuickFilters((prev) => ({ ...prev, hasPromo: true }));
+  }, [searchParams]);
 
   const filteredProperties = properties.filter((p) => {
     if (selectedType !== "all" && p.type !== selectedType) return false;
     if (selectedCity !== "all" && p.city.slug !== selectedCity) return false;
     if (priceRange.min && p.pricePerNight < parseInt(priceRange.min)) return false;
     if (priceRange.max && p.pricePerNight > parseInt(priceRange.max)) return false;
+    if (minRating > 0 && p.rating < minRating) return false;
+    if (quickFilters.freeBreakfast && !p.freeBreakfast) return false;
+    if (quickFilters.refundable && !p.refundable) return false;
+    if (quickFilters.instantBooking && !p.instantBooking) return false;
+    if (quickFilters.hasPromo && !(p.discount && p.discount > 0) && !p.isFlashSale)
+      return false;
     if (selectedFacilities.length > 0) {
       const propertyFacilityIds = p.facilities.map((f) => f.id);
       if (!selectedFacilities.every((f) => propertyFacilityIds.includes(f))) return false;
@@ -67,6 +93,20 @@ export default function PropertiesPage() {
         return b.totalReviews - a.totalReviews;
     }
   });
+
+  const resetFilters = () => {
+    setSelectedType("all");
+    setSelectedCity("all");
+    setPriceRange({ min: "", max: "" });
+    setSelectedFacilities([]);
+    setMinRating(0);
+    setQuickFilters({
+      freeBreakfast: false,
+      refundable: false,
+      instantBooking: false,
+      hasPromo: false,
+    });
+  };
 
   const FilterContent = () => (
     <div className="space-y-6">
@@ -148,9 +188,10 @@ export default function PropertiesPage() {
           {[3, 4, 4.5].map((rating) => (
             <Button
               key={rating}
-              variant="outline"
+              variant={minRating === rating ? "default" : "outline"}
               size="sm"
-              className="text-xs"
+              className={`text-xs ${minRating === rating ? "bg-blue-600 text-white" : ""}`}
+              onClick={() => setMinRating(minRating === rating ? 0 : rating)}
             >
               <Star className="h-3 w-3 fill-amber-400 text-amber-400 mr-0.5" />
               {rating}+
@@ -190,23 +231,47 @@ export default function PropertiesPage() {
         <Label className="text-sm font-semibold mb-3 block">Filter Cepat</Label>
         <div className="space-y-2">
           <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox />
+            <Checkbox
+              checked={quickFilters.freeBreakfast}
+              onCheckedChange={(c) =>
+                setQuickFilters({ ...quickFilters, freeBreakfast: !!c })
+              }
+            />
             <span className="text-sm">Gratis Sarapan</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox />
+            <Checkbox
+              checked={quickFilters.refundable}
+              onCheckedChange={(c) =>
+                setQuickFilters({ ...quickFilters, refundable: !!c })
+              }
+            />
             <span className="text-sm">Bisa Refund</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox />
+            <Checkbox
+              checked={quickFilters.instantBooking}
+              onCheckedChange={(c) =>
+                setQuickFilters({ ...quickFilters, instantBooking: !!c })
+              }
+            />
             <span className="text-sm">Instant Booking</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox />
+            <Checkbox
+              checked={quickFilters.hasPromo}
+              onCheckedChange={(c) =>
+                setQuickFilters({ ...quickFilters, hasPromo: !!c })
+              }
+            />
             <span className="text-sm">Promo</span>
           </label>
         </div>
       </div>
+
+      <Button variant="outline" className="w-full" onClick={resetFilters}>
+        Reset Filter
+      </Button>
     </div>
   );
 
@@ -264,7 +329,7 @@ export default function PropertiesPage() {
 
                 {/* Active Filters */}
                 {selectedType !== "all" && (
-                  <Badge variant="secondary" className="gap-1">
+                  <Badge variant="secondary" className="gap-1 capitalize">
                     {selectedType}
                     <X
                       className="h-3 w-3 cursor-pointer"
@@ -324,15 +389,7 @@ export default function PropertiesPage() {
                 <p className="text-muted-foreground mb-2">
                   Tidak ada penginapan yang cocok dengan filter Anda.
                 </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedType("all");
-                    setSelectedCity("all");
-                    setPriceRange({ min: "", max: "" });
-                    setSelectedFacilities([]);
-                  }}
-                >
+                <Button variant="outline" onClick={resetFilters}>
                   Reset Filter
                 </Button>
               </div>
@@ -357,5 +414,19 @@ export default function PropertiesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PropertiesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="h-8 w-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+        </div>
+      }
+    >
+      <PropertiesContent />
+    </Suspense>
   );
 }
